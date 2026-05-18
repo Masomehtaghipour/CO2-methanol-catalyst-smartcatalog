@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -190,5 +189,3 @@ if filtered_df.get("score") is not None and filtered_df["score"].notna().any():
     )
 else:
     st.warning("No valid score, cannot show plot and ranking.")
-mt1417@mt1417-ProLiant-DL360p-Gen8:~/catalyst_app$ cd ~/catalyst_app
-cat app.py
