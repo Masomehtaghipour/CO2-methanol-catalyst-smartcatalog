@@ -23,7 +23,8 @@ st.markdown(
 # ---------- 1. Load base dataset ----------
 @st.cache_data
 def load_base_data():
-    df = pd.read_csv("/home/mt1417/SmartCatalog_final_ML_ready.csv")
+    # IMPORTANT: for Streamlit Cloud, use the CSV inside the repo
+    df = pd.read_csv("SmartCatalog_final_ML_ready.csv")
     return df
 
 base_df = load_base_data()
@@ -159,7 +160,7 @@ st.dataframe(
 # ---------- 3. Plot, ranking, and export ----------
 st.subheader("3. Plot, ranking, and export")
 
-if filtered_df.get("score") is not None and filtered_df["score"].notna().any():
+if "score" in filtered_df.columns and filtered_df["score"].notna().any():
     ranked_df = filtered_df.sort_values("score", ascending=False)
 
     top_n = st.slider("How many top candidates to show?", 5, 100, 10, 1)
