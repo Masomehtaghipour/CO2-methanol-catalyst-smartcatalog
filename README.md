@@ -85,5 +85,10 @@ Dataset compilation, modeling, and the Streamlit application were developed by t
 ## License
 
 This work is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), matching the license registered on the [Zenodo record](https://doi.org/10.5281/zenodo.20181400).
-▶️ **Launch the live app:**  
+
+
+
+
+
+
 [Open Streamlit dashboard](https://co2-methanol-catalyst-smartcatalog-wpflpqvc5j8jozjqsks9ka.streamlit.app/)
