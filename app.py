@@ -14,10 +14,28 @@ st.caption(
 )
 
 st.markdown(
-    "This internal data-driven tool provides a structured, interactive view of preprocessed "
-    "catalyst data for CO2-to-methanol hydrogenation. It helps users filter, inspect and rank "
-    "candidates based on precomputed performance and stability indicators, without exposing "
-    "the underlying implementation details."
+    """
+    This dashboard provides an **interactive view of a model-generated screening table**
+    for CO2-to-methanol catalysts, built on a literature dataset of 1,339 experimental
+    records from 57 published studies.
+
+    - The 459 base–support combinations shown here are **model predictions** at fixed
+      reference conditions (250 °C, 30 bar, H₂/CO₂ = 3) — not all of them are
+      experimentally tested systems.
+    - Only **68 of 459** combinations (≈15%) correspond to a base–support pair that
+      actually appears in the underlying literature data. The rest are
+      **extrapolations** of a linear regression model and should be treated as
+      hypotheses for experimental follow-up, not confirmed results.
+    - Use the **"Tested only"** filter below to restrict the table to
+      experimentally grounded combinations.
+    """
+)
+
+st.warning(
+    "⚠️ Most rows in this table are model-derived predictions, not direct "
+    "experimental measurements. Check the **Is_Tested** column before treating "
+    "a candidate as validated.",
+    icon="⚠️",
 )
 
 # ---------- 1. Load base dataset ----------
@@ -35,10 +53,22 @@ st.subheader("1. Data overview")
 # In this version we only use the internal SmartCatalog dataset (no file upload).
 merged_df = base_df.copy()
 
-st.write("Final data shape for scoring:", merged_df.shape)
+if "Is_Tested" not in merged_df.columns:
+    st.error(
+        "Column 'Is_Tested' not found in SmartCatalog_final_ML_ready.csv. "
+        "Please regenerate the dataset to include the tested-vs-extrapolated flag."
+    )
+    merged_df["Is_Tested"] = np.nan
+
+n_tested = int(merged_df["Is_Tested"].sum()) if merged_df["Is_Tested"].notna().any() else 0
+st.write(
+    f"Final data shape for scoring: {merged_df.shape}  "
+    f"({n_tested} experimentally tested combinations, "
+    f"{merged_df.shape[0] - n_tested} model extrapolations)"
+)
 st.dataframe(merged_df.head())
 
-# ---------- 1b. Filters (Base, Support, Stable, Selected, Ratios) ----------
+# ---------- 1b. Filters (Base, Support, Stable, Selected, Ratios, Tested) ----------
 st.sidebar.header("Filters")
 
 # unique values for categorical filters
@@ -56,6 +86,16 @@ stable_filter = st.sidebar.selectbox(
 selected_filter = st.sidebar.selectbox(
     "Selected?",
     ["(All)", "Only selected (Is_Selected=1)", "Only not selected (Is_Selected=0)"],
+)
+
+# provenance filter: experimentally tested vs. model extrapolation
+tested_filter = st.sidebar.selectbox(
+    "Provenance",
+    [
+        "(All — tested + extrapolated)",
+        "Tested only (experimentally observed)",
+        "Extrapolated only (model prediction, untested)",
+    ],
 )
 
 # numeric filters for ratios
@@ -101,6 +141,11 @@ if selected_filter == "Only selected (Is_Selected=1)":
 elif selected_filter == "Only not selected (Is_Selected=0)":
     filtered_df = filtered_df[filtered_df["Is_Selected"] == 0]
 
+if tested_filter == "Tested only (experimentally observed)":
+    filtered_df = filtered_df[filtered_df["Is_Tested"] == True]
+elif tested_filter == "Extrapolated only (model prediction, untested)":
+    filtered_df = filtered_df[filtered_df["Is_Tested"] == False]
+
 # apply numeric filters
 filtered_df = filtered_df[
     (filtered_df["Best_H2CO2_ratio"] >= best_h2co2_range[0]) &
@@ -130,12 +175,15 @@ def normalize(series):
 required_cols = [
     "Base", "Support",
     "Best_H2CO2_ratio", "Best_MeOH_yield_ratio",
-    "Is_Stable", "Is_Selected"
+    "Is_Stable", "Is_Selected", "Is_Tested"
 ]
 
 missing = [c for c in required_cols if c not in filtered_df.columns]
 if missing:
     st.error(f"Missing required columns in data: {missing}")
+    filtered_df["score"] = np.nan
+elif filtered_df.empty:
+    st.warning("No rows match the current filters. Adjust filters to see results.")
     filtered_df["score"] = np.nan
 else:
     filtered_df["yield_norm"] = normalize(filtered_df["Best_MeOH_yield_ratio"])
@@ -153,7 +201,7 @@ st.dataframe(
     filtered_df[[
         "Base", "Support",
         "Best_H2CO2_ratio", "Best_MeOH_yield_ratio",
-        "Is_Stable", "Is_Selected", "score"
+        "Is_Stable", "Is_Selected", "Is_Tested", "score"
     ]].head()
 )
 
@@ -168,9 +216,16 @@ if "score" in filtered_df.columns and filtered_df["score"].notna().any():
     top_df = ranked_df[[
         "Base", "Support",
         "Best_H2CO2_ratio", "Best_MeOH_yield_ratio",
-        "Is_Stable", "Is_Selected", "score"
+        "Is_Stable", "Is_Selected", "Is_Tested", "score"
     ]].head(top_n)
     st.dataframe(top_df)
+
+    n_top_tested = int(top_df["Is_Tested"].sum())
+    st.caption(
+        f"Of the {len(top_df)} candidates shown above, "
+        f"{n_top_tested} are experimentally tested and "
+        f"{len(top_df) - n_top_tested} are model extrapolations."
+    )
 
     st.write("Scatter plot: Best_H2CO2_ratio vs Best_MeOH_yield_ratio (color = score)")
     plot_df = ranked_df.copy()
